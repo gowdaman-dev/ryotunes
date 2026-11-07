@@ -18,6 +18,15 @@ class LyricsController extends ChangeNotifier {
   Lyrics? get lyrics => _lyrics;
   String? get videoId => _videoId;
 
+  /// Forget fetched lyrics so they are looked up again.
+  void clearCache() {
+    _cache.clear();
+    _videoId = null;
+    _lyrics = null;
+    _status = LyricsStatus.idle;
+    notifyListeners();
+  }
+
   Future<void> load(SongItem song, {bool force = false}) async {
     if (!force && _videoId == song.videoId && _status != LyricsStatus.failed) return;
     _videoId = song.videoId;

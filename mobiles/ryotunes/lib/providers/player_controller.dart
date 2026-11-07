@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/song.dart';
 import '../services/audio_handler.dart';
+import '../services/notification_permission.dart';
 import '../services/youtube_music_service.dart';
 
 enum LoopSetting { off, all, one }
@@ -95,6 +96,7 @@ class PlayerController extends ChangeNotifier {
     _completionHandled = false;
     _error = PlaybackError.none;
     onPlay?.call(item);
+    NotificationPermission.requestOnce();
     _now = item;
     _paused = false;
     _loading = true;

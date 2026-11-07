@@ -122,6 +122,11 @@ class LibraryController extends ChangeNotifier {
     _changed();
   }
 
+  void clearRecent() {
+    _recent.clear();
+    _changed();
+  }
+
   void addRecent(SongItem song) {
     _recent.removeWhere((s) => s.videoId == song.videoId);
     _recent.insert(0, song);

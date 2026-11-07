@@ -338,8 +338,12 @@ class YouTubeMusicService {
   static const _playerEndpoint = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
   static const _visionOs = _StreamClient('VISIONOS', '0.1', '101', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
       {'osName': 'visionOS', 'osVersion': '1.3.21O771', 'deviceMake': 'Apple', 'deviceModel': 'RealityDevice14,1'});
+  /// When true, pick the smallest AAC stream instead of the best one (set from Settings).
+  static bool dataSaver = false;
+
   String? _visitorData;
   final Map<String, StreamCandidate> _streamCache = {};
+  String _cacheKey(String videoId) => '$videoId|${dataSaver ? 'saver' : 'high'}';
 
   Future<String?> _ensureVisitorData({bool refresh = false}) async {
     if (_visitorData != null && !refresh) return _visitorData;
@@ -359,19 +363,22 @@ class YouTubeMusicService {
   }
 
   /// Forget a cached URL (it expired or the CDN refused it) so the next attempt resolves a fresh one.
-  void invalidateStream(String videoId) => _streamCache.remove(videoId);
+  void invalidateStream(String videoId) {
+    _streamCache.remove('$videoId|high');
+    _streamCache.remove('$videoId|saver');
+  }
 
   /// Playable sources for [videoId], best first. Lazy: the next source is only resolved if the
   /// consumer asks for it because the previous one failed to play.
   Stream<StreamCandidate> streamCandidates(String videoId) async* {
-    final cached = _streamCache[videoId];
+    final cached = _streamCache[_cacheKey(videoId)];
     if (cached != null && cached.expires.isAfter(DateTime.now())) yield cached;
 
     // 1) VISIONOS with the current visitor session; if refused, retry once with a fresh session.
     var found = await _resolveDirect(videoId, _visionOs, await _ensureVisitorData());
     found ??= await _resolveDirect(videoId, _visionOs, await _ensureVisitorData(refresh: true));
     if (found != null) {
-      _streamCache[videoId] = found;
+      _streamCache[_cacheKey(videoId)] = found;
       if (cached == null || found.url != cached.url) yield found;
     }
 
@@ -412,8 +419,15 @@ class YouTubeMusicService {
           .where((f) => (f['mimeType'] as String).startsWith('audio/') && f['url'] != null)
           .toList();
       if (formats.isEmpty) return null;
-      // Prefer AAC (audio/mp4) for broad player support, highest bitrate first.
-      int rank(Map<String, dynamic> f) => ((f['mimeType'] as String).startsWith('audio/mp4') ? 1 << 30 : 0) + (f['bitrate'] as int? ?? 0);
+      // Prefer AAC (audio/mp4) for broad player support. High quality takes the highest bitrate;
+      // data saver takes the lowest one that is still listenable (>= 40 kbps).
+      int bitrate(Map<String, dynamic> f) => f['bitrate'] as int? ?? 0;
+      int rank(Map<String, dynamic> f) {
+        final aac = (f['mimeType'] as String).startsWith('audio/mp4') ? 1 << 30 : 0;
+        if (!dataSaver) return aac + bitrate(f);
+        final usable = bitrate(f) >= 40000;
+        return aac + (usable ? (1 << 20) - bitrate(f) ~/ 1000 : 0);
+      }
       formats.sort((a, b) => rank(b).compareTo(rank(a)));
       return StreamCandidate(
         url: formats.first['url'] as String,
