@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_now_playing_label">Ryotunes · Now Playing</string>
+    <string name="widget_now_playing_desc">Artwork, song and playback controls</string>
+    <string name="widget_compact_label">Ryotunes · Compact</string>
+    <string name="widget_compact_desc">A slim player bar with play and next</string>
+    <string name="widget_idle_title">Ryotunes</string>
+    <string name="widget_idle_subtitle">Tap to start listening</string>
+</resources>
