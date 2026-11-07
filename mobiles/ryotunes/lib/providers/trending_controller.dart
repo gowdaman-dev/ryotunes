@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/song.dart';
 import '../services/youtube_music_service.dart';
 
@@ -26,7 +27,21 @@ class TrendingController extends ChangeNotifier {
   final Map<String, Future<List<SongItem>> Function()> _fetchers = {};
   String _language = trendingLanguages.first;
 
+  static const _languageKey = 'trending.language';
+
   String get language => _language;
+
+  /// Restore the language the user last picked, then load its trending and new-release feeds.
+  Future<void> init() async {
+    try {
+      final saved = (await SharedPreferences.getInstance()).getString(_languageKey);
+      if (saved != null && trendingLanguages.contains(saved)) _language = saved;
+    } catch (e) {
+      debugPrint('Language restore failed: $e');
+    }
+    notifyListeners();
+    await Future.wait([loadTrending(_language), loadNew(_language)]);
+  }
 
   Feed feed(String key) => _feeds[key] ?? const Feed(FeedStatus.idle);
   Feed trending([String? lang]) => feed('trending:${lang ?? _language}');
@@ -40,6 +55,10 @@ class TrendingController extends ChangeNotifier {
     if (lang == _language) return;
     _language = lang;
     notifyListeners();
+    SharedPreferences.getInstance().then((p) => p.setString(_languageKey, lang)).catchError((Object e) {
+      debugPrint('Language save failed: $e');
+      return true;
+    });
     await Future.wait([loadTrending(lang), loadNew(lang)]);
   }
 

@@ -33,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
     for (final s in recent) {
       final lead = s.artists.split(RegExp(r',|&')).first.trim();
       if (lead.isNotEmpty) seen.add(lead);
-      if (seen.length == 2) break;
+      if (seen.length == 1) break;
     }
     return seen.toList();
   }
@@ -56,16 +56,15 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    // The selected language's trending songs always lead Home; personal rows come after.
+    final top = trending.trending();
     final seedFeed = seeds.isNotEmpty ? trending.artist(seeds.first) : null;
-    final usePersonal = seedFeed != null && seedFeed.status == FeedStatus.ready;
-    final picksFeed = usePersonal ? seedFeed : trending.trending();
-    final picksEyebrow = usePersonal ? 'More like ${seeds.first}' : 'Popular in ${trending.language}';
-    final secondFeed = seeds.length > 1 ? trending.artist(seeds[1]) : null;
     final cardWidth = (MediaQuery.of(context).size.width - Sp.pagePad * 2 - 24).clamp(200.0, 600.0);
     final hour = DateTime.now().hour;
     final greeting = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
     final yourPlaylists = library.playlists;
-    final top = trending.trending();
+    const heroCount = 8;
+    final moreTrending = top.songs.skip(heroCount).take(7).toList();
 
     return CustomScrollView(
       cacheExtent: 800,
@@ -89,10 +88,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              const SectionHeader(title: 'Top Picks for You'),
-              if (picksFeed.songs.isEmpty && picksFeed.status != FeedStatus.failed)
+              SectionHeader(title: 'Trending in ${trending.language}', eyebrow: 'Updated daily'),
+              if (top.songs.isEmpty && top.status != FeedStatus.failed)
                 SkeletonHero(width: cardWidth, height: cardWidth)
-              else if (picksFeed.songs.isEmpty)
+              else if (top.songs.isEmpty)
                 FeedError(onRetry: () => context.read<TrendingController>().loadTrending(trending.language, force: true))
               else
                 SizedBox(
@@ -100,18 +99,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: Sp.pagePad),
-                    itemCount: picksFeed.songs.length.clamp(0, 8),
+                    itemCount: top.songs.length.clamp(0, heroCount),
                     separatorBuilder: (_, _) => const SizedBox(width: 14),
                     itemBuilder: (_, i) {
-                      final s = picksFeed.songs[i];
+                      final s = top.songs[i];
                       return HeroCard(
                         width: cardWidth,
                         height: cardWidth,
-                        eyebrow: picksEyebrow,
+                        eyebrow: '#${i + 1} trending in ${trending.language}',
                         title: s.title,
                         caption: s.artists,
                         thumbnail: s.thumbnail,
-                        onTap: () => _play(picksFeed.songs, i),
+                        onTap: () => _play(top.songs, i),
                       );
                     },
                   ),
@@ -153,21 +152,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
               ),
-              if (secondFeed != null && secondFeed.status == FeedStatus.ready) ...[
+              if (seedFeed != null && seedFeed.status == FeedStatus.ready) ...[
                 const SizedBox(height: 20),
-                SectionHeader(title: 'Because you played ${seeds[1]}'),
-                for (var i = 0; i < secondFeed.songs.length.clamp(0, 5); i++)
-                  TrackRow(song: secondFeed.songs[i], playing: player.now?.videoId == secondFeed.songs[i].videoId, onTap: () => _play(secondFeed.songs, i)),
+                SectionHeader(title: 'Because you played ${seeds.first}'),
+                for (var i = 0; i < seedFeed.songs.length.clamp(0, 5); i++)
+                  TrackRow(song: seedFeed.songs[i], playing: player.now?.videoId == seedFeed.songs[i].videoId, onTap: () => _play(seedFeed.songs, i)),
               ],
-              const SizedBox(height: 20),
-              SectionHeader(title: 'Trending in ${trending.language}', eyebrow: 'See the full chart on New', onTap: () => context.go('/new')),
-              if (top.songs.isEmpty && top.status != FeedStatus.failed)
-                const SkeletonTrackList(count: 5)
-              else if (top.songs.isEmpty)
-                FeedError(onRetry: () => context.read<TrendingController>().loadTrending(trending.language, force: true))
-              else
-                for (var i = 0; i < top.songs.length.clamp(0, 5); i++)
-                  TrackRow(song: top.songs[i], playing: player.now?.videoId == top.songs[i].videoId, onTap: () => _play(top.songs, i)),
+              if (moreTrending.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                SectionHeader(title: 'More trending in ${trending.language}', eyebrow: 'See the full chart on New', onTap: () => context.go('/new')),
+                for (var i = 0; i < moreTrending.length; i++)
+                  TrackRow(song: moreTrending[i], playing: player.now?.videoId == moreTrending[i].videoId, onTap: () => _play(top.songs, heroCount + i)),
+              ],
               const SizedBox(height: kShellBottomInset),
             ],
           ),

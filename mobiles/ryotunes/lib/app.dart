@@ -24,7 +24,7 @@ class RyotunesApp extends StatelessWidget {
           WidgetSync(player); // keeps the home-screen widgets in step with playback
           return player;
         }),
-        ChangeNotifierProvider(create: (_) => TrendingController()..loadTrending(trendingLanguages.first)..loadNew(trendingLanguages.first)),
+        ChangeNotifierProvider(create: (_) => TrendingController()..init()),
       ],
       child: MaterialApp.router(
         title: 'Ryotunes',
